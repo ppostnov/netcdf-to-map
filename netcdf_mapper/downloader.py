@@ -17,5 +17,5 @@ class FileRecipient(object):
                 'version': 'v2.1.1',
                 'year': '2018',
             },
-            f'{filename}.zip'
+            f'data\\{filename}.zip'
         )

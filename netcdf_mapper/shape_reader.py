@@ -11,35 +11,39 @@
 import matplotlib.pyplot as plt
 # Либа для чтения шейпов
 import shapefile
-# читаем шейп с этой либой
-shape = shapefile.Reader(r'..\..\storage\Belgorod\Adminbndy3')
-# Дочитываем - на выходе GeoJSON
-feature = shape.shapeRecords()[0]
-first = feature.shape.__geo_interface__
-print(first) # (GeoJSON format)
-
-# Теперь этот GeoJson нужно скормить shapely и ее методам для построения полигонов
 # Импортируем классы по строительству полигонов и точек
 from shapely.geometry import Polygon
 from shapely.geometry import Point
 
-# создаем обьект точку с парой координат (тут их много, тестил попадание точек в полигон)
-point = Point([(37.2,50.7)])
-point = Point([(37.2,50.7)])
-point = Point([(38,49.7)])
-point = Point([(38.752,51.02)])
+class Polygon_reader:
+    def __init__(self, filepath, poly_id):
+        # читаем шейп
+        self.shape = shapefile.Reader(filepath)
+        self.poly_id = poly_id
+        self.polygon_creator()
 
-# создаем полигон, прочитанный из шейпа
-# (там есть кейворд "coordinates", в котором лежат координаты полигонов - берем первый)
-polygon = Polygon(first['coordinates'][0])
+    def polygon_creator(self):
+        # Дочитываем - на выходе GeoJSON
+        self.feature = self.shape.shapeRecords()[self.poly_id]
+        self.first = self.feature.shape.__geo_interface__
+        # создаем полигон, прочитанный из шейпа
+        # (там есть кейворд "coordinates", в котором лежат координаты полигонов - берем первый)
+        self.polygon = Polygon(self.first['coordinates'][0])
 
-# Проверяем лежит ли точка внутри полигона или нет
-# (тут два способа, чем отличаются пока не ясно- работают вроде одинаково)
-print(point.within(polygon))
-print(polygon.contains(point))
+    def is_point_inside(self, lat, lon):
+        # создаем обьект точку с парой координат
+        point = Point(lat, lon)
+        # Проверяем лежит ли точка внутри полигона или нет
+        return self.polygon.contains(point)
 
-# Рисуем полигон в матплотлибе
-# как рисовать точку пока не разобрался - получается неправильно
-x,y = polygon.exterior.xy
-plt.plot(x,y)
-plt.show()
+    def draw(self):
+        # Рисуем полигон в матплотлибе
+        # как рисовать точку пока не разобрался - получается неправильно
+        x, y = self.polygon.exterior.xy
+        plt.plot(x, y)
+        plt.show()
+
+
+poly = Polygon_reader(r'..\..\storage\Belgorod\Adminbndy3', poly_id=0)
+print(poly.is_point_inside(lat=38.752, lon=51.02))
+poly.draw()

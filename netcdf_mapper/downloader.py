@@ -1,4 +1,5 @@
 import cdsapi
+import zipfile
 
 
 class FileRecipient(object):
@@ -19,3 +20,16 @@ class FileRecipient(object):
             },
             f'data\\{filename}.zip'
         )
+
+    def unzipper(self, filename: str):
+        with zipfile.ZipFile(f'data\\{filename}.zip', 'r') as zip_ref:
+            zip_ref.extractall('data')
+
+    def clearner(self):
+        pass
+
+    def parser(self):
+        pass    
+
+    def execute(self):
+        pass

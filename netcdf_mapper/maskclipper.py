@@ -1,6 +1,7 @@
 import geopandas as gpd
 import salem
 import matplotlib.pyplot as plt
+import logging
 
 
 class MaskClipper:
@@ -41,12 +42,10 @@ class MaskClipper:
         self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.shape_path)
 
     def every_clip(self):
-        '''
+        """
         Метод для клиппинга датасета в область шейпа
-        :return:
-        '''
-        #print("Clipping..")
-        logger.info('Clipping..')
+        """
+        logging.info('Clipping..')
 
         self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.shape_list[0])
         print(self.var_to_analyze)
@@ -55,94 +54,31 @@ class MaskClipper:
         print(dir(self.var_to_analyze))
         print('all:', self.var_to_analyze.count())
         whole = self.var_to_analyze.count()
-        flag_values=[10,11,12,
-                     20,
-                     30,
-                     40,
-                     50,
-                     60,61,62,
-                     70,71,72,
-                     80,81,82,
-                     90,
-                     100,
-                     160,
-                     170,
-                     110,
-                     130,
-                     180,
-                     190,
-                     120,121,122,
-                     140,
-                     150,151,152,153,
-                     200,201,202,
-                     210,
-                     220
-                     ]
+
+        flag_values = [
+            10, 11, 12, 20, 30, 40, 50,
+            60, 61, 62, 70, 71, 72, 80,
+            81, 82, 90, 100, 160, 170,
+            110, 130, 180, 190, 120, 121,
+            122, 140, 150, 151, 152, 153,
+            200, 201, 202, 210, 220
+        ]
                      
         part_dict = {i: self.var_to_analyze.where(self.var_to_analyze == i).count() for i in flag_values}
-        per=0
+        per = 0
         for i in part_dict:
-            per_par=part_dict[i]/whole*100
-            per+=per_par
+            per_par = part_dict[i]/whole*100
+            per += per_par
             print("parts", i, part_dict[i], per_par)
         print("whole", per)
       
-
     def draw_map(self):
-        '''
-        Метод для отрисовки датасета (уже отклипленного шейпом)
-        :return:
-        '''
-        #print("Drawing..")
-        logger.info('Drawing..')
-        # Создаем обьект quick_map
+        """
+        Dataset drawling
+        """
+        logging.info('Drawing..')
         self.map_object = self.var_to_analyze.salem.quick_map()
-        # вот эта штука в нативном пайтоне рисовать не хочет\ или рисует шляпу
-        #self.map_object.visualize()
-        # рисуем матплотлибом
         plt.show()
-
 
     def print_types(self):
         print(type(self.data_set), self.data_set)
-
-
-
-
-import logging
-
-logger = logging.getLogger('dev')
-logger.setLevel(logging.INFO)
-
-consoleHandler = logging.StreamHandler()
-consoleHandler.setLevel(logging.INFO)
-
-logger.addHandler(consoleHandler)
-
-formatter = logging.Formatter('%(asctime)s  %(name)s  %(levelname)s: %(message)s')
-consoleHandler.setFormatter(formatter)
-
-logger.info('информационное сообщение')
-
-# Прописываем пути к файлам
-nc_path = "data\C3S-LC-L4-LCCS-Map-300m-P1Y-2018-v2.1.1.nc"
-shp_path = "data\\regions\szfo\Arkhangelskaya_oblast.shp"
-
-# Создаем обьект Клиппера и кидаем в него пути к файлам
-MC = MaskClipper(nc_path, shp_path)
-
-# Указываем какую переменную будем рисовать и для какого момента времени
-MC.create_variable(variable='lccs_class', timevalue=0)
-
-# просто принт того, какого типа данные считались
-#MC.print_types()
-
-# обрезаем датасет под интересующую область
-MC.subset()
-# обрезаем датасет под шейп
-
-#MC.clip()
-MC.every_clip()
-
-# рисуем то, что получилось
-MC.draw_map()

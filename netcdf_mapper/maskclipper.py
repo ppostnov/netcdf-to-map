@@ -180,7 +180,8 @@ class MaskClipper:
         new_lat = np.linspace(ds.lat.values[0], ds.lat.values[-1], num_lat)
 
         # переинтерполируем датасет
-        dsi = ds.interp(lat=new_lat, lon=new_lon)
+        dsi = ds.interp(method='nearest', lat=new_lat, lon=new_lon)
+
         return dsi
 
     def draw_map(self):

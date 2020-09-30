@@ -3,6 +3,8 @@ import salem
 import matplotlib.pyplot as plt
 import logging
 
+import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.colors as colors
@@ -150,6 +152,37 @@ class MaskClipper:
                 # пишем словарь в файл
                 writer.writerow(dict)
 
+    def coarser_grid(self, ds, res_x=0.01, res_y=0.01):
+        '''
+        Метод для переинтерполяции датасета на грид с другим шагом
+        :param ds: входной датасет
+        :param res_x: шаг по долготе (в градусах)
+        :param res_y: шаг по широте (в градусах)
+        :return: переинтерполированный датасет
+        '''
+        # модуль математики для элементарных операций
+        import math
+        # считаем сколько градусов между концами грида по широте и долготе
+        num_lon= math.fabs(ds.lon.values[0]-ds.lon.values[-1])
+        num_lat= math.fabs(ds.lat.values[0]-ds.lat.values[-1])
+
+        # считаем точное количество точек
+        num_lon=num_lon/res_x
+        num_lat=num_lat/res_y
+
+        # интерполяции нужны целые числа - округляем сверху
+        # (можно округлять снизу, но я решил, что это может быть опасно потерей данных - просто чуйка ничего более)
+        num_lon=int(math.ceil(num_lon))
+        num_lat = int(math.ceil(num_lat))
+
+        # создаем массивы новых широт и долгот
+        new_lon = np.linspace(ds.lon.values[0], ds.lon.values[-1], num_lon)
+        new_lat = np.linspace(ds.lat.values[0], ds.lat.values[-1], num_lat)
+
+        # переинтерполируем датасет
+        dsi = ds.interp(lat=new_lat, lon=new_lon)
+        return dsi
+
     def draw_map(self):
         """
         Dataset drawling
@@ -176,10 +209,17 @@ class MaskClipper:
         # создается цветовая схема для отрисовки colorbar, разделенного на классы
         cmap, norm = matplotlib.colors.from_levels_and_colors(self.fv, self.fc)
 
+        # Переинтерполяция на более грубую сетку
+        # у нас по умолчанию сетка 300м (это что-то около 0.003 градуса)
+        print('interpolate')
+        self.var_to_analyze = self.coarser_grid(self.var_to_analyze, res_x=0.01, res_y=0.01)
+
         # отрисовка данных
-        self.var_to_analyze.plot(ax=ax, transform=proj, cmap=cmap, norm=norm)
+        print('plot')
+        self.var_to_analyze.plot(ax=ax, transform=ccrs.PlateCarree(), cmap=cmap, norm=norm)
 
         # Костыль для удаления лишнего colorbar  (если этого не будет отрисоваться будет 2 colorbar`а)
+        print('color bar')
         ax1 = plt.gca()
         im = ax1.collections # если не работает попробовать использовать ax1.images
         cb = im[-1].colorbar

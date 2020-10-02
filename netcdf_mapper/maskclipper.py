@@ -12,6 +12,10 @@ import matplotlib.colors as colors
 from netCDF4 import Dataset
 import csv
 
+import pandas
+import geopandas
+
+
 import cartopy.crs as ccrs
 import cartopy
 from cartopy.io.shapereader import Reader
@@ -26,33 +30,76 @@ class MaskClipper:
         self.shape_path = shape_path
         # читаем датасет
         self.data_set = salem.open_xr_dataset(self.nc_path)
-        # читаем шейп
-        self.shapes = salem.read_shapefile(self.shape_path)
-        # делаем список шейпов из прочитанного шейпа
-        self.shape_list = [self.shapes.loc[self.shapes["name"] == i] for i in self.shapes["name"]]
-        # получаем центроид
-        self.centroid = self.retrieve_centroid(self.shape_list)
-        # получаем данные о классах, их цветах и значениях из файла
-        self.fv, self.fc, self.fm =self.get_colors_from_netcdf(self.nc_path)
 
-    def retrieve_centroid(self, shape_list):
+        # сшиваем шейпы в один геодата фрейм
+        self.merged_shape = pandas.concat([
+            geopandas.read_file(shp)
+            for shp in shape_path
+        ]).pipe(geopandas.GeoDataFrame)
+
+        # читаем шейп
+        if type(self.shape_path) == str:
+            # делаем список шейпов из прочитанного шейпа
+            self.shape_list = [salem.read_shapefile(self.shape_path)]
+        elif type(self.shape_path) == list:
+            # делаем список шейпов из прочитанных шейпов
+            self.shape_list = [salem.read_shapefile(i) for i in self.shape_path]
+
+        # получаем центроид
+        self.centroid = self.retrieve_centroid(self.shape_list, method=2)
+        print(self.centroid)
+        # получаем данные о классах, их цветах и значениях из файла
+        self.fv, self.fc, self.fm = self.get_colors_from_netcdf(self.nc_path)
+
+    def retrieve_centroid(self, shape_list, method=2):
         '''
         Метод для получения центроида для полигона или группы полигонов (получаем средневзвешанную точку центроидов полигонов)
         :param shape_list:
         :return:
         '''
+        if method==1:
+            try:
+                # копируем список  шейпов
+                points = shape_list.copy()
+                # получаем список центроидов всех полигонов
+                x = [i['geometry'].centroid.x[0] for i in points]
+                y = [i['geometry'].centroid.y[0] for i in points]
+                # получаем средний центроид
+                centroid = (sum(x)/len(points), sum(y)/len(points))
+            except:
+                # если ошибка ставим нули
+                centroid = (0, 0)
 
-        try:
-            # копируем список  шейпов
-            points = shape_list.copy()
-            # получаем список центроидов всех полигонов
-            x = [i['geometry'].centroid.x[0] for i in points]
-            y = [i['geometry'].centroid.y[0] for i in points]
-            # получаем средний центроид
-            centroid = (sum(x)/len(points), sum(y)/len(points))
-        except:
-            # если ошибка ставим нули
+        elif method == 2:
+            '''
+            второй метод для поиска центроида - считает крайние точки всех шейпов из списка
+            а потом считает полусумму крайних долгот и крайних широт
+            '''
             centroid = (0, 0)
+            Xmin=99999.9
+            Xmax=-99999.9
+            Ymin=99999.9
+            Ymax=-99999.9
+
+            Xcent=0
+            Ycent=0
+
+            for shape in shape_list:
+                bd = shape.bounds
+                if Xmin >= bd.minx[0]:
+                    Xmin = bd.minx[0]
+                if Xmax <= bd.maxx[0]:
+                    Xmax = bd.maxx[0]
+                if Ymin >= bd.miny[0]:
+                    Ymin = bd.miny[0]
+                if Ymax <= bd.maxy[0]:
+                    Ymax = bd.maxy[0]
+
+            Xcent = (Xmax+Xmin)/2
+            Ycent = (Ymax+Ymin)/2
+
+            centroid = (Xcent, Ycent)
+
         return centroid
 
     def get_colors_from_netcdf(self, file_path):
@@ -95,8 +142,8 @@ class MaskClipper:
         #print("Subsetting..")
         #logger.info('Subsetting..')
         print('Subsetting..')
-        self.var_to_analyze = self.var_to_analyze.salem.subset(shape=self.shapes, margin=2)
-        #print(self.var_to_analyze)
+        self.var_to_analyze = self.var_to_analyze.salem.subset(shape=self.merged_shape, margin=2)
+
 
     def clip(self):
         '''
@@ -106,7 +153,7 @@ class MaskClipper:
         #print("Clipping..")
         #logger.info('Clipping..')
         print('Clipping..')
-        self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.shapes)
+        self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.merged_shape)
 
     def statistic_calculation(self, file_out='names.csv'):
         """
@@ -152,6 +199,11 @@ class MaskClipper:
                 # пишем словарь в файл
                 writer.writerow(dict)
 
+    def resave_netcdf(self, ds, filename):
+        '''пересохраняет xarray в netcdf'''
+        # http://xarray.pydata.org/en/stable/generated/xarray.Dataset.to_netcdf.html
+        ds.to_netcdf(path=filename)
+
     def coarser_grid(self, ds, res_x=0.01, res_y=0.01):
         '''
         Метод для переинтерполяции датасета на грид с другим шагом
@@ -163,16 +215,16 @@ class MaskClipper:
         # модуль математики для элементарных операций
         import math
         # считаем сколько градусов между концами грида по широте и долготе
-        num_lon= math.fabs(ds.lon.values[0]-ds.lon.values[-1])
-        num_lat= math.fabs(ds.lat.values[0]-ds.lat.values[-1])
+        num_lon = math.fabs(ds.lon.values[0]-ds.lon.values[-1])
+        num_lat = math.fabs(ds.lat.values[0]-ds.lat.values[-1])
 
         # считаем точное количество точек
-        num_lon=num_lon/res_x
-        num_lat=num_lat/res_y
+        num_lon = num_lon/res_x
+        num_lat = num_lat/res_y
 
         # интерполяции нужны целые числа - округляем сверху
         # (можно округлять снизу, но я решил, что это может быть опасно потерей данных - просто чуйка ничего более)
-        num_lon=int(math.ceil(num_lon))
+        num_lon = int(math.ceil(num_lon))
         num_lat = int(math.ceil(num_lat))
 
         # создаем массивы новых широт и долгот
@@ -210,6 +262,10 @@ class MaskClipper:
         # создается цветовая схема для отрисовки colorbar, разделенного на классы
         cmap, norm = matplotlib.colors.from_levels_and_colors(self.fv, self.fc)
 
+        # Сохранение клипнутых данных в netcdf
+        self.resave_netcdf(self.var_to_analyze, filename='clipped_data.nc')
+
+
         # Переинтерполяция на более грубую сетку
         # у нас по умолчанию сетка 300м (это что-то около 0.003 градуса)
         print('interpolate')
@@ -239,7 +295,9 @@ class MaskClipper:
         # Добавляем шейпы стран
         ax.add_feature(cartopy.feature.BORDERS)
         # Добавляем шейп из входного файла (шейп которым резали)
-        ax.add_geometries(self.shapes['geometry'], crs=proj, facecolor='none', edgecolor='black')
+        #ax.add_geometries(self.shapes['geometry'], crs=proj, facecolor='none', edgecolor='black')
+        for shape in self.shape_list:
+            ax.add_geometries(shape['geometry'], crs=proj, facecolor='none', edgecolor='black')
         # ? не знаю что это делает
         ax.set_extent(self.var_to_analyze.salem.grid.extent, crs=proj)
         # Открываем окно карты

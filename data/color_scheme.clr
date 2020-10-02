@@ -1,0 +1,46 @@
+10 255 255 100 255 cropland_rainfed
+11 255 255 100 255 cropland_rainfed_herbaceous_cover
+12 255 255 0 255 cropland_rainfed_tree_or_shrub_cover
+20 170 240 240 255 cropland_irrigated
+30 220 240 100 255 mosaic_cropland
+40 200 200 100 255 mosaic_natural_vegetation
+
+50 0 100 0 255 tree_broadleaved_evergreen_closed_to_open
+
+60 0 160 0 255 tree_broadleaved_deciduous_closed_to_open
+61 0 160 0 255 tree_broadleaved_deciduous_closed
+70 0 60 0 255 tree_needleleaved_evergreen_closed_to_open
+80 40 80 0 255 tree_needleleaved_deciduous_closed_to_open
+
+90 120 130 0 255 tree_mixed
+
+100 140 160 0 255 mosaic_tree_and_shrub
+
+110 190 150 0 255 mosaic_herbaceous
+
+120 150 100 0 255 shrubland
+
+121 150 100 0 255 shrubland_evergreen
+122 150 100 0 255 shrubland_deciduous
+130 255 180 50 255 grassland
+
+140 255 220 210 255 lichens_and_mosses
+
+150 255 235 175 255 sparse_vegetation
+151 255 200 100 255 sparse_tree
+152 255 210 120 255 sparse_shrub
+
+153 255 235 175 255 sparse_herbaceous
+
+160 0 120 90 255 tree_cover_flooded_fresh_or_brakish_water
+
+170 0 150 120 255 tree_cover_flooded_saline_water
+180 0 220 130 255 shrub_or_herbaceous_cover_flooded
+
+190 195 20 0 255 urban
+
+200 255 245 215 255 bare_areas
+201 220 220 220 255 bare_areas_consolidated
+202 255 245 215 255 bare_areas_unconsolidated
+210 0 70 200 255 water
+220 255 255 255 255 snow_and_ice

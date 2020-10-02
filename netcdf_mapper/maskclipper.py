@@ -45,9 +45,10 @@ class MaskClipper:
             # делаем список шейпов из прочитанных шейпов
             self.shape_list = [salem.read_shapefile(i) for i in self.shape_path]
 
+
         # получаем центроид
         self.centroid = self.retrieve_centroid(self.shape_list, method=2)
-        print(self.centroid)
+
         # получаем данные о классах, их цветах и значениях из файла
         self.fv, self.fc, self.fm = self.get_colors_from_netcdf(self.nc_path)
 
@@ -85,6 +86,7 @@ class MaskClipper:
             Ycent=0
 
             for shape in shape_list:
+
                 bd = shape.bounds
                 if Xmin >= bd.minx[0]:
                     Xmin = bd.minx[0]
@@ -155,7 +157,7 @@ class MaskClipper:
         print('Clipping..')
         self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.merged_shape)
 
-    def statistic_calculation(self, file_out='names.csv'):
+    def statistic_calculation(self, file_out='names.csv', resave_every_nc=True):
         """
         Метод для оценки статистики по разным классам поверхности
         """
@@ -188,6 +190,11 @@ class MaskClipper:
             for shape in self.shape_list:
                 # вырезаем данные под шейп
                 self.var_to_calculate = self.var_to_analyze.salem.roi(shape=shape)
+
+                if resave_every_nc:
+                    # сохраняем для каждого шейпа netcdf
+                    filename = shape.name[0].strip().replace(' ','')+'.nc'
+                    self.resave_netcdf(self.var_to_calculate, filename)
                 # считаем сколько точек там всего
                 whole = self.var_to_calculate.count()
                 # считаем сколько точек для каждого класса (в процентах)
@@ -195,7 +202,7 @@ class MaskClipper:
                 # переписываем этот словарик чистыми значениями
                 dict = {i: part_dict[i].values for i in part_dict}
                 # обновляем словарик для экспорта
-                dict.update({'shape_name': shape["name"], 'file_name': self.nc_path})
+                dict.update({'shape_name': shape["name"][0], 'file_name': self.nc_path})
                 # пишем словарь в файл
                 writer.writerow(dict)
 

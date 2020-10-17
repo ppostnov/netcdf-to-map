@@ -1,5 +1,6 @@
 import cdsapi
 import zipfile
+import logging
 
 
 class FileRecipient(object):
@@ -9,27 +10,29 @@ class FileRecipient(object):
     def __init__(self):
         self.c = cdsapi.Client()
 
-    def download(self, year: str, filename: str) -> object:
+    def download(self, year: str, filename: str, ver: str) -> object:
         self.c.retrieve(
             'satellite-land-cover',
             {
                 'variable': 'all',
                 'format': 'zip',
-                'version': 'v2.1.1',
-                'year': '2018',
+                'version': ver,
+                'year': year,
             },
-            f'data\\{filename}.zip'
+            f'data\\netcdf\\{filename}.zip'
         )
 
-    def unzipper(self, filename: str):
-        with zipfile.ZipFile(f'data\\{filename}.zip', 'r') as zip_ref:
-            zip_ref.extractall('data')
+    def unzip(self, filename: str):
+        logging.info(f'Unzipping {filename}...')
+        with zipfile.ZipFile(f'data\\netcdf\\{filename}.zip', 'r') as zip_ref:
+            zip_ref.extractall('data\\netcdf')
+        logging.info('Unzip is complete')
 
     def clearner(self):
         pass
 
     def parser(self):
-        pass    
+        pass
 
     def execute(self):
         pass

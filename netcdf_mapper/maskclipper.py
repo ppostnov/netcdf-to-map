@@ -2,91 +2,66 @@ import geopandas as gpd
 import salem
 import matplotlib.pyplot as plt
 import logging
-
 import numpy as np
-
 import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.colors as colors
-
-from netCDF4 import Dataset
 import csv
-
 import pandas
 import geopandas
-
-
 import cartopy.crs as ccrs
 import cartopy
 from cartopy.io.shapereader import Reader
 from cartopy.feature import ShapelyFeature
+from netCDF4 import Dataset
 
-class MaskClipper:
+
+class MaskClipper():
+    """
+    """
     def __init__(self, nc_path, shape_path):
-        # открываем netcdf и шейп
-        #logger.info('Open files..')
-        print('Open files..')
         self.nc_path = nc_path
         self.shape_path = shape_path
-        # читаем датасет
         self.data_set = salem.open_xr_dataset(self.nc_path)
+        # merge all files to one dataframe
+        self.merged_shape = pandas.concat(
+            [geopandas.read_file(shp)for shp in shape_path]
+            ).pipe(geopandas.GeoDataFrame)
 
-        # сшиваем шейпы в один геодата фрейм
-        self.merged_shape = pandas.concat([
-            geopandas.read_file(shp)
-            for shp in shape_path
-        ]).pipe(geopandas.GeoDataFrame)
-
-        # читаем шейп
+        # shape reading
         if type(self.shape_path) == str:
-            # делаем список шейпов из прочитанного шейпа
             self.shape_list = [salem.read_shapefile(self.shape_path)]
         elif type(self.shape_path) == list:
-            # делаем список шейпов из прочитанных шейпов
             self.shape_list = [salem.read_shapefile(i) for i in self.shape_path]
 
-
-        # получаем центроид
+        # get centroind
         self.centroid = self.retrieve_centroid(self.shape_list, method=2)
-
-        # получаем данные о классах, их цветах и значениях из файла
+        # get classes, colors, values
         self.fv, self.fc, self.fm = self.get_colors_from_netcdf(self.nc_path)
 
     def retrieve_centroid(self, shape_list, method=2):
-        '''
-        Метод для получения центроида для полигона или группы полигонов (получаем средневзвешанную точку центроидов полигонов)
-        :param shape_list:
-        :return:
-        '''
-        if method==1:
+        """
+        Get a centroid for a polygon or group of polygons
+        """
+        if method == 1:
             try:
-                # копируем список  шейпов
                 points = shape_list.copy()
-                # получаем список центроидов всех полигонов
                 x = [i['geometry'].centroid.x[0] for i in points]
                 y = [i['geometry'].centroid.y[0] for i in points]
-                # получаем средний центроид
                 centroid = (sum(x)/len(points), sum(y)/len(points))
-            except:
-                # если ошибка ставим нули
+            except centroid.DoesNotExist:
                 centroid = (0, 0)
 
         elif method == 2:
-            '''
-            второй метод для поиска центроида - считает крайние точки всех шейпов из списка
-            а потом считает полусумму крайних долгот и крайних широт
-            '''
             centroid = (0, 0)
-            Xmin=99999.9
-            Xmax=-99999.9
-            Ymin=99999.9
-            Ymax=-99999.9
-
-            Xcent=0
-            Ycent=0
+            Xmin = 99999.9
+            Xmax = -99999.9
+            Ymin = 99999.9
+            Ymax = -99999.9
+            Xcent = 0
+            Ycent = 0
 
             for shape in shape_list:
-
                 bd = shape.bounds
                 if Xmin >= bd.minx[0]:
                     Xmin = bd.minx[0]
@@ -105,68 +80,60 @@ class MaskClipper:
         return centroid
 
     def get_colors_from_netcdf(self, file_path):
-        '''
-        метод для вытаскивания информации о классах из датасета
-        :param file_path:
-        :return:
-        '''
-
-        # читаем датасет
+        """
+        Unpack a data from the netcdf dataset
+        """
         ds = Dataset(file_path)
-        # берем список значений классов (в цифрах)
+        # get numbers of classes
         fv = ds['lccs_class'].flag_values.tolist()
-        # берем список советуемых цветов классов (список строк)
+        # get colors of classes
         fc = ds['lccs_class'].flag_colors.split()
-        # берем список значений классов (список строк)
+        # get meanings of classes
         fm = ds['lccs_class'].flag_meanings.split()
-        # вставляем черный цвет для 'no data' - его в датасете нет
+        # add black color for 'no data'
         fc.insert(0, '#000000')
-        # вставляем значение 230 - нужно для правильной отрисовки цветовой шкалы
-        # - иначе последние значения в нем не отразятся (которые про воду и лёд)
+        # add value to dataset for ice and water
         fv.append(230)
-        # вставляем значение пустое значение для 230 - чтобы на шкале на уровне 230 ничего не писалось
+        # add meaning for 230 value
         fm.append('')
         return fv, fc, fm
 
     def create_variable(self, variable, timevalue=0):
-        # вычленяем нужную переменную (по ключу)
-        # и ставим для ее временной переменной нужное значение
-        # (важно! имя времени в нашем netcdf "time" поэтому ей и присваиваем )
-        #logger.info('Variable creation..')
-        print('Variable creation..')
+        """
+        Unpack neccesary varible
+        """
+        logging.info(f'Unpacking variable {variable}')
         self.var_to_analyze = self.data_set[variable].isel(time=timevalue)
 
     def subset(self):
-        '''
-        Метод для очистки датасета (видимо данные, которые не находятся "рядом" с шейпом уходят из анализа)
-        :return:
-        '''
-        #print("Subsetting..")
-        #logger.info('Subsetting..')
-        print('Subsetting..')
-        self.var_to_analyze = self.var_to_analyze.salem.subset(shape=self.merged_shape, margin=2)
-
+        """
+        Take only neccesary data from netcdf
+        according to shape data
+        """
+        logging.info('Subsetting data')
+        self.var_to_analyze = self.var_to_analyze.salem.subset(
+            shape=self.merged_shape, margin=2
+            )
 
     def clip(self):
-        '''
-        Метод для клиппинга датасета в область шейпа
-        :return:
-        '''
-        #print("Clipping..")
-        #logger.info('Clipping..')
-        print('Clipping..')
-        self.var_to_analyze = self.var_to_analyze.salem.roi(shape=self.merged_shape)
-
-    def statistic_calculation(self, file_out='names.csv', resave_every_nc=True):
         """
-        Метод для оценки статистики по разным классам поверхности
+        Final erasing of netcdf data
+        according to shape data
         """
-        logging.info('Stats..')
+        logging.info('Clipping data')
+        self.var_to_analyze = self.var_to_analyze.salem.roi(
+            shape=self.merged_shape
+            )
+        logging.info('Creating final netcdf dataset')  
+        self.resave_netcdf(self.var_to_analyze, filename='netcdf_dataset.nc')
 
-        # открываем файл для записи
+    def statistic_calculation(
+            self,
+            file_out='output\\statistic.csv',
+            resave_every_nc=True
+            ):
+        logging.info('Statistic creation')
         with open(file_out, 'w', newline='', encoding='utf-8') as csvfile:
-
-            # cписок классов по которым считается статистика
             flag_values = [
                 0, 10, 11, 12, 20, 30, 40, 50,
                 60, 61, 62, 70, 71, 72, 80,
@@ -176,40 +143,43 @@ class MaskClipper:
                 200, 201, 202, 210, 220
             ]
 
-            # cоздаем список колонок для выходного файла
             fieldnames = ['shape_name', 'file_name']
             fieldnames.extend(flag_values)
-
-            # cоздаем обьект записывателя
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
-
-            # пишем заголовки
+            writer = csv.DictWriter(
+                csvfile,
+                fieldnames=fieldnames,
+                delimiter=';'
+                )
             writer.writeheader()
 
-            # для каждого шейпа из списка..
             for shape in self.shape_list:
-                # вырезаем данные под шейп
-                self.var_to_calculate = self.var_to_analyze.salem.roi(shape=shape)
+                self.var_to_calculate = self.var_to_analyze.salem.roi(
+                    shape=shape
+                    )
 
-                if resave_every_nc:
-                    # сохраняем для каждого шейпа netcdf
-                    filename = shape.name[0].strip().replace(' ','')+'.nc'
-                    self.resave_netcdf(self.var_to_calculate, filename)
-                # считаем сколько точек там всего
+                # if resave_every_nc:
+                    # filename = shape.name[0].strip().replace(' ', '') + '.nc'
+                    # self.resave_netcdf(self.var_to_calculate, filename)
+                # total count of points
                 whole = self.var_to_calculate.count()
-                # считаем сколько точек для каждого класса (в процентах)
-                part_dict = {i: self.var_to_calculate.where(self.var_to_calculate == i).count() / whole * 100 for i in flag_values}
-                # переписываем этот словарик чистыми значениями
+                # % of points for each class
+                part_dict = {
+                    i: self.var_to_calculate.where(self.var_to_calculate == i).count() 
+                    / whole * 100 for i in flag_values
+                    }
+
                 dict = {i: part_dict[i].values for i in part_dict}
-                # обновляем словарик для экспорта
-                dict.update({'shape_name': shape["name"][0], 'file_name': self.nc_path})
-                # пишем словарь в файл
+                dict.update(
+                    {'shape_name': shape["name"][0], 'file_name': self.nc_path}
+                    )
                 writer.writerow(dict)
 
     def resave_netcdf(self, ds, filename):
-        '''пересохраняет xarray в netcdf'''
-        # http://xarray.pydata.org/en/stable/generated/xarray.Dataset.to_netcdf.html
-        ds.to_netcdf(path=filename)
+        """
+        Xarray to netcdf
+        http://xarray.pydata.org/en/stable/generated/xarray.Dataset.to_netcdf.html
+        """
+        ds.to_netcdf(path=f'output\\{filename}')
 
     def coarser_grid(self, ds, res_x=0.01, res_y=0.01):
         '''
@@ -270,7 +240,7 @@ class MaskClipper:
         cmap, norm = matplotlib.colors.from_levels_and_colors(self.fv, self.fc)
 
         # Сохранение клипнутых данных в netcdf
-        self.resave_netcdf(self.var_to_analyze, filename='clipped_data.nc')
+        # self.resave_netcdf(self.var_to_analyze, filename='clipped_data.nc')
 
 
         # Переинтерполяция на более грубую сетку

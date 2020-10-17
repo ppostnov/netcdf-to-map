@@ -1,0 +1,14 @@
+<PAMDataset>
+  <Subdataset name="lccs_class">
+    <PAMDataset>
+      <PAMRasterBand band="1">
+        <Metadata>
+          <MDI key="STATISTICS_MAXIMUM">210</MDI>
+          <MDI key="STATISTICS_MEAN">191.15619298405</MDI>
+          <MDI key="STATISTICS_MINIMUM">70</MDI>
+          <MDI key="STATISTICS_STDDEV">32.614447895299</MDI>
+        </Metadata>
+      </PAMRasterBand>
+    </PAMDataset>
+  </Subdataset>
+</PAMDataset>

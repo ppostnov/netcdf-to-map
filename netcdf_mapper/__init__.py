@@ -1,3 +1,14 @@
+"""
+    Инициализурующий файл основного модуля netcdf_mapper.
+    Файл импортирует два класса - downloader и maskclipper,
+    и инициализирует их в своем объекте Absorber. Absorber
+    в свою очередь имеет метод execute() который отвечает
+    за запуск отсновного функционала приложения. Здесь же
+    определена базовая конфигурация для логгирования во
+    всем приложении.
+"""
+
+
 import logging
 from netcdf_mapper import downloader
 from netcdf_mapper import maskclipper

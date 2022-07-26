@@ -1,0 +1,9 @@
+#virtualenv
+venv
+
+#python
+__pycache__
+
+#data files
+data/*
+!data/README.MD 
